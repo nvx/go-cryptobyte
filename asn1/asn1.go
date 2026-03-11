@@ -35,6 +35,7 @@ const (
 	OBJECT_IDENTIFIER = Tag(6)
 	ENUM              = Tag(10)
 	UTF8String        = Tag(12)
+	RelativeOID       = Tag(13)
 	SEQUENCE          = Tag(16 | classConstructed)
 	SET               = Tag(17 | classConstructed)
 	PrintableString   = Tag(19)

@@ -103,13 +103,13 @@ func (s *String) ReadUint64(out *uint64) bool {
 	return true
 }
 
-func (s *String) readUnsigned(out *uint32, length int) bool {
+func (s *String) ReadUnsigned(out *uint32, length int) bool {
 	v := s.read(length)
 	if v == nil {
 		return false
 	}
 	var result uint32
-	for i := 0; i < length; i++ {
+	for i := range length {
 		result <<= 8
 		result |= uint32(v[i])
 	}

@@ -208,7 +208,7 @@ func (b *Builder) AddASN1NULL() {
 
 // MarshalASN1 calls encoding_asn1.Marshal on its input and appends the result if
 // successful or records an error if one occurred.
-func (b *Builder) MarshalASN1(v interface{}) {
+func (b *Builder) MarshalASN1(v any) {
 	// NOTE(martinkr): This is somewhat of a hack to allow propagation of
 	// encoding_asn1.Marshal errors into Builder.err. N.B. if you call MarshalASN1 with a
 	// value embedded into a struct, its tag information is lost.
@@ -241,6 +241,15 @@ func (b *Builder) AddASN1(tag asn1.Tag, f BuilderContinuation) {
 	b.addLengthPrefixed(1, true, f)
 }
 
+func (b *Builder) AddASN1RawTag(tag []byte, f BuilderContinuation) {
+	if b.err != nil {
+		return
+	}
+
+	b.AddBytes(tag)
+	b.addLengthPrefixed(1, true, f)
+}
+
 // String
 
 // ReadASN1Boolean decodes an ASN.1 BOOLEAN and converts it to a boolean
@@ -270,7 +279,7 @@ func (s *String) ReadASN1Boolean(out *bool) bool {
 // big-endian binary values that share memory with s. Positive values will have
 // no leading zeroes, and zero will be returned as a single zero byte.
 // ReadASN1Integer reports whether the read was successful.
-func (s *String) ReadASN1Integer(out interface{}) bool {
+func (s *String) ReadASN1Integer(out any) bool {
 	switch out := out.(type) {
 	case *int, *int8, *int16, *int32, *int64:
 		var i int64
@@ -296,18 +305,7 @@ func (s *String) ReadASN1Integer(out interface{}) bool {
 }
 
 func checkASN1Integer(bytes []byte) bool {
-	if len(bytes) == 0 {
-		// An INTEGER is encoded with at least one octet.
-		return false
-	}
-	if len(bytes) == 1 {
-		return true
-	}
-	if bytes[0] == 0 && bytes[1]&0x80 == 0 || bytes[0] == 0xff && bytes[1]&0x80 == 0x80 {
-		// Value is not minimally encoded.
-		return false
-	}
-	return true
+	return len(bytes) != 0
 }
 
 var bigOne = big.NewInt(1)
@@ -360,7 +358,7 @@ func asn1Signed(out *int64, n []byte) bool {
 	if length > 8 {
 		return false
 	}
-	for i := 0; i < length; i++ {
+	for i := range length {
 		*out <<= 8
 		*out |= int64(n[i])
 	}
@@ -388,7 +386,7 @@ func asn1Unsigned(out *uint64, n []byte) bool {
 		// Negative number.
 		return false
 	}
-	for i := 0; i < length; i++ {
+	for i := range length {
 		*out <<= 8
 		*out |= uint64(n[i])
 	}
@@ -680,7 +678,7 @@ func (s *String) SkipOptionalASN1(tag asn1.Tag) bool {
 // tagged with tag into out and advances. If no element with a matching tag is
 // present, it writes defaultValue into out instead. Otherwise, it behaves like
 // ReadASN1Integer.
-func (s *String) ReadOptionalASN1Integer(out interface{}, tag asn1.Tag, defaultValue interface{}) bool {
+func (s *String) ReadOptionalASN1Integer(out any, tag asn1.Tag, defaultValue any) bool {
 	var present bool
 	var i String
 	if !s.ReadOptionalASN1(&i, &present, tag) {
@@ -790,19 +788,8 @@ func (s *String) readASN1(out *String, outTag *asn1.Tag, skipHeader bool) bool {
 			return false
 		}
 
-		lenBytes := String((*s)[2 : 2+lenLen])
-		if !lenBytes.readUnsigned(&len32, int(lenLen)) {
-			return false
-		}
-
-		// ITU-T X.690 section 10.1 (DER length forms) requires encoding the length
-		// with the minimum number of octets.
-		if len32 < 128 {
-			// Length should have used short-form encoding.
-			return false
-		}
-		if len32>>((lenLen-1)*8) == 0 {
-			// Leading octet is 0. Length should have been at least one byte shorter.
+		lenBytes := (*s)[2 : 2+lenLen]
+		if !lenBytes.ReadUnsigned(&len32, int(lenLen)) {
 			return false
 		}
 

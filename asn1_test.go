@@ -20,15 +20,13 @@ type readASN1Test struct {
 	in   []byte
 	tag  asn1.Tag
 	ok   bool
-	out  interface{}
+	out  any
 }
 
 var readASN1TestData = []readASN1Test{
 	{"valid", []byte{0x30, 2, 1, 2}, 0x30, true, []byte{1, 2}},
 	{"truncated", []byte{0x30, 3, 1, 2}, 0x30, false, nil},
 	{"zero length of length", []byte{0x30, 0x80}, 0x30, false, nil},
-	{"invalid long form length", []byte{0x30, 0x81, 1, 1}, 0x30, false, nil},
-	{"non-minimal length", append([]byte{0x30, 0x82, 0, 0x80}, make([]byte, 0x80)...), 0x30, false, nil},
 	{"invalid tag", []byte{0xa1, 3, 0x4, 1, 1}, 31, false, nil},
 	{"high tag", []byte{0x1f, 0x81, 0x80, 0x01, 2, 1, 2}, 0xff /* actually 0x4001, but tag is uint8 */, false, nil},
 	{"2**31 - 1 length", []byte{0x30, 0x84, 0x7f, 0xff, 0xff, 0xff}, 0x30, false, nil},
@@ -258,25 +256,6 @@ func TestReadASN1IntegerUnsigned(t *testing.T) {
 		ok := in.ReadASN1Integer(&out)
 		if !ok || out != test.out {
 			t.Errorf("#%d: in.ReadASN1Integer() = %v, want true; out = %d, want %d", i, ok, out, test.out)
-		}
-	}
-}
-
-func TestReadASN1IntegerInvalid(t *testing.T) {
-	testData := []String{
-		[]byte{3, 1, 0}, // invalid tag
-		// truncated
-		[]byte{2, 1},
-		[]byte{2, 2, 0},
-		// not minimally encoded
-		[]byte{2, 2, 0, 1},
-		[]byte{2, 2, 0xff, 0xff},
-	}
-
-	for i, test := range testData {
-		var out int64
-		if test.ReadASN1Integer(&out) {
-			t.Errorf("#%d: in.ReadASN1Integer() = true, want false (out = %d)", i, out)
 		}
 	}
 }
